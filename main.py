@@ -1,6 +1,7 @@
 import time
-import bittrex
 from pprint import pprint
+
+import bittrex
 import bot_class
 import requests
 
@@ -9,25 +10,28 @@ import requests
 class ScriptError(Exception):
     pass
 
+
 # загрузка последнего update_id из файла
 def load_last_msg(filename):
     with open(filename) as f:
         last_msg = int(f.readlines()[-1].rstrip())
     return last_msg
 
+
 # загрузка данных из файла
 def load_text(filename):
     text = []
     with open(filename) as f:
-
         for line in f.readlines():
             text.append(line.rstrip())
     return text
+
 
 # сохранение новых данных в файл
 def save_text(filename, type, *args):
     with open(filename, type) as f:
         f.write(str(*args) + '\n')
+
 
 # Выставление ордеров по репосту сообщения из чата Forstage team
 def signals_from_fostage(update):
@@ -62,14 +66,10 @@ def signals_from_fostage(update):
 
                     if buy_order['success']:
                         print(buy_order['result']['uuid'])
-                        save_text(log_open_buy_order,'a', buy_order['result']['uuid'])  #сохраняем в файл
+                        save_text(log_open_buy_order, 'a', buy_order['result']['uuid'])  # сохраняем в файл
                     bot.send_message(bot.get_chat_id(update),
                                      f'{text_buy} ордер на покупку {pair.split("-")[1]} '
                                      f'\nпо цене: {buy:.8f}\nколичество: {quantity:.8f} ')
-
-
-
-
 
             else:
                 # print('Не содержит сигнала')
@@ -80,44 +80,35 @@ def signals_from_fostage(update):
         print('Сообщение не из чата Forsage Team')
 
 
-
-
-
-# токен телеграмм бота
-TOKEN = '739770367:AAFlprJWibNhoZ6Yw-8N4RW-0zsbUeXkGD0'
-
 # имя файла для update_id
-log_msg = 'msg_log.txt' # файл для хранения последнего id сообщения
-log_open_buy_order = 'buy_order_log.txt' # файл для хранения открытых ордеров на покупку
+log_msg = 'msg_log.txt'  # файл для хранения последнего id сообщения
+log_open_buy_order = 'buy_order_log.txt'  # файл для хранения открытых ордеров на покупку
 
 # экземпляр класса
 bot = bot_class.BotHandler(TOKEN)
 
+if __name__ == '__main__':
+    # основной цикл
+    while True:
+        # try:
+        # последнее обновление, offset=<id last message>, last=True - последнее сообщение
+        update = bot.get_updates(offset=load_last_msg(log_msg), last=True)
+        buy_order_list = load_text(log_open_buy_order)  # список открытых ордеров
+        print(buy_order_list)
+        # проверка исполения/отмены ордера на покупку
 
+        buy_order_list, closed_order_list = bittrex.del_closed_order(buy_order_list)
+        print(buy_order_list, closed_order_list)
+        save_text(log_open_buy_order, 'w', *buy_order_list)
 
+        if update['update_id'] == load_last_msg(log_msg):
+            pass
+        else:
+            print('Новое сообщение. Добавляем в базу.')
+            save_text(log_msg, update['update_id'])
+            signals_from_fostage(update)
 
-# основной цикл
-while True:
-# try:
-    # последнее обновление, offset=<id last message>, last=True - последнее сообщение
-    update = bot.get_updates(offset=load_last_msg(log_msg), last=True)
-    buy_order_list = load_text(log_open_buy_order)  # список открытых ордеров
-    print(buy_order_list)
-    # проверка исполения/отмены ордера на покупку
-
-    buy_order_list, closed_order_list = bittrex.del_closed_order(buy_order_list)
-    print(buy_order_list, closed_order_list)
-    save_text(log_open_buy_order, 'w',*buy_order_list)
-
-
-    if update['update_id'] == load_last_msg(log_msg):
-        pass
-    else:
-        print('Новое сообщение. Добавляем в базу.')
-        save_text(log_msg, update['update_id'])
-        signals_from_fostage(update)
-
-    print('Новый цикл')
-    time.sleep(1)
-    # except Exception as e:
-    #     print(e)
+        print('Новый цикл')
+        time.sleep(1)
+        # except Exception as e:
+        #     print(e)
