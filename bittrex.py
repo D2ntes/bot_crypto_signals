@@ -6,7 +6,7 @@ from pprint import pprint
 
 API_KEY = 'd912feebbf3e49d78fd81481427ba95d'
 # обратите внимание, что добавлена 'b' перед строкой
-API_SECRET = b'4f6eb42d10c145b7b43f54f3250674a0'
+
 
 
 API_URL = 'bittrex.com'
