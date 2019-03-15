@@ -26,7 +26,6 @@ python-utils==2.3.0
 requests==2.7.0
 six==1.12.0
 soupsieve==1.8
-TA-Lib==0.4.17
 telebot==0.0.3
 telepot==12.7
 TgCrypto==1.1.1
