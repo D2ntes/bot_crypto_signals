@@ -6,6 +6,11 @@ import bot_class
 import requests
 
 
+TOKEN = '739770367:AAFlprJWibNhoZ6Yw-8N4RW-0zsbUeXkGD0'
+# имя файла для update_id
+log_msg = 'msg_log.txt'  # файл для хранения последнего id сообщения
+log_open_buy_order = 'buy_order_log.txt'  # файл для хранения открытых ордеров на покупку
+
 # Свой класс исключений
 class ScriptError(Exception):
     pass
@@ -80,17 +85,17 @@ def signals_from_fostage(update):
         print('Сообщение не из чата Forsage Team')
 
 
-# имя файла для update_id
-log_msg = 'msg_log.txt'  # файл для хранения последнего id сообщения
-log_open_buy_order = 'buy_order_log.txt'  # файл для хранения открытых ордеров на покупку
-
-# экземпляр класса
-bot = bot_class.BotHandler(TOKEN)
-
 if __name__ == '__main__':
+
+
+
+    # экземпляр класса
+    bot = bot_class.BotHandler(TOKEN)
+
+
     # основной цикл
     while True:
-        TOKEN = '739770367:AAFlprJWibNhoZ6Yw-8N4RW-0zsbUeXkGD0'
+
         # try:
         # последнее обновление, offset=<id last message>, last=True - последнее сообщение
         update = bot.get_updates(offset=load_last_msg(log_msg), last=True)
