@@ -90,6 +90,7 @@ bot = bot_class.BotHandler(TOKEN)
 if __name__ == '__main__':
     # основной цикл
     while True:
+        TOKEN = '739770367:AAFlprJWibNhoZ6Yw-8N4RW-0zsbUeXkGD0'
         # try:
         # последнее обновление, offset=<id last message>, last=True - последнее сообщение
         update = bot.get_updates(offset=load_last_msg(log_msg), last=True)
