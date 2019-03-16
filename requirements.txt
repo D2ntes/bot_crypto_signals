@@ -1,13 +1,20 @@
 aiohttp==3.5.4
+async-timeout==3.0.1
 attrs==18.2.0
+beautifulsoup4==4.7.1
 certifi==2018.11.29
 chardet==3.0.4
 cx-Freeze==5.1.1
-cycler==0.10.0
+matplotlib==3.0.2
+mpl-finance==0.10.0
+multidict==4.5.2
+numpy==1.16.1
+pyparsing==2.3.1
+PySocks==1.6.8
 pyTelegramBotAPI==2.2.3
 python-dateutil==2.8.0
 python-utils==2.3.0
 requests==2.7.0
-soupsieve==1.8
-urllib3==1.24.1
+telebot==0.0.3
+telepot==12.7
 
