@@ -17,4 +17,5 @@ python-utils==2.3.0
 requests==2.7.0
 telebot==0.0.3
 telepot==12.7
+boto==2.49.0
 
