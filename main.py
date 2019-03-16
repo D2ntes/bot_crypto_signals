@@ -1,120 +1,150 @@
+import sqlite3
 import time
-from pprint import pprint
+from datetime import datetime
+from typing import List, Any, Union
 
 import bittrex
 import bot_class
-import requests
+
+TOKEN = ''
+
+orders_db = sqlite3.connect("orders.db")  # orders(uid, status, date_open, date_closed)
+messages_db = sqlite3.connect("messages.db")  # messages(id, text, date)
+cursor_orders = orders_db.cursor()
+cursor_messages = messages_db.cursor()
 
 
-TOKEN = '739770367:AAFlprJWibNhoZ6Yw-8N4RW-0zsbUeXkGD0'
-# имя файла для update_id
-log_msg = 'msg_log.txt'  # файл для хранения последнего id сообщения
-log_open_buy_order = 'buy_order_log.txt'  # файл для хранения открытых ордеров на покупку
+# cursor_orders.execute("""DELETE FROM orders""")
+# orders_db.commit()
+
+
+# cursor_messages.execute("""CREATE TABLE messages
+# (id_msg,text_msg,date_msg)
+# """)
+
+def signals_from_fostage(bot, update):
+    if bot.from_chat_id(update) == -1001149814828:  # id_chat Forstage team
+        msg_text = update['message']['text'].split()
+        if 'Покупка' in msg_text[1][1:]:
+            pair = msg_text[0].strip('🏎').split('/')
+            pair = pair[1] + '-' + pair[0]
+
+            buy = float(msg_text[2][:-1])
+            sell = list(map(float, (msg_text[4][:-1], msg_text[6][:-1], msg_text[8][:-1])))
+            bot.send_message(bot.get_chat_id(update),
+                             '{} купить по {:.8f},\nЦели: {:.8f}, {:.8f}, {:.8f}'.format(pair, buy, *sell))
+
+            if pair in bittrex.all_markets():  # если пара есть на бирже Bittrex
+                bot.send_message(bot.get_chat_id(update), 'УРА! Эта пара есть на Биттрекс!')
+                buy_order_bittrex_forstage(buy, pair, bot, update)
+
+
+        else:
+            print('Не содержит сигнала')
+            bot.send_message(bot.get_chat_id(update), 'Не содержит сигнала')
+    else:
+        bot.send_message(bot.get_chat_id(update), 'Сообщение не из чата Forsage Team')
+
+
+# Открытие ордера на Bittrex
+def buy_order_bittrex_forstage(buy, pair, bot, update):
+    buy = buy / 2  # для отладки цена ордера уменьшина в 2 раза, чтобы ордер не сработал
+    # quantity = float(bittrex.balance_btc(
+    #     'BTC')) * 0.04 / buy  # 0.04 - ордер на 4% от доступного депозита BTC
+    quantity = 0.0005 / buy  # ордер на сумму 0.0005 BTC
+    buy_order, text_buy = bittrex.buylimit(pair, buy, quantity)
+    print(buy_order)
+
+    # если ордер создан успешно, вносим в базу ордеров
+    if buy_order['success']:
+        info_order = bittrex.order_info(buy_order['result']['uuid'])
+        value_msg: List[Any, Any, Any, Any] = [info_order['result']['OrderUuid'], \
+                                               info_order['result']['Exchange'], \
+                                               info_order['result']['Opened'], \
+                                               info_order['result']['ImmediateOrCancel']]
+
+        cursor_orders.execute(
+            """INSERT INTO orders
+               VALUES (?,?,?,?)""",
+            value_msg
+        )
+        orders_db.commit()
+        bot.send_message(bot.get_chat_id(update),
+                         f'{text_buy} ордер на покупку {pair.split("-")[1]} '
+                         f'\nпо цене: {buy:.8f}\nколичество: {quantity:.8f} '
+                         f'\n{value_msg[0]}')
+    else:
+        bot.send_message(bot.get_chat_id(update), f"Ордер не создан по причине:\n{buy_order['message']}")
+
+    # отправленеи сообщение в чат о результатах создания ордера
+
+
+def new_msg(bot_telegram):
+    # id последнего письма из базы данных
+    cursor_messages.execute("SELECT id_msg FROM messages ORDER BY date_msg DESC LIMIT 1")
+    last_id_msg = cursor_messages.fetchone()
+
+    # получение обновлений из чата
+    update = bot_telegram.get_updates(offset=last_id_msg, last=True)
+    update.update({'Not empty': True})
+
+    if update['update_id'] != last_id_msg[0]:
+        # добавление данных нового письма в базу
+        value_msg: List[Union[datetime, Any]] = [update['update_id'], update['message']['text'],
+                                                 datetime.fromtimestamp(update['message']['date'])]
+        cursor_messages.execute(
+            """INSERT INTO messages
+               VALUES (?,?,?)""",
+            value_msg
+        )
+        messages_db.commit()
+    else:
+        update = {'message': {'chat': {'id': update['message']['chat']['id']}}, 'Not empty': False}
+
+    return update
+
+
+def check_order_close(bot, update):
+    cursor_orders.execute("SELECT * FROM orders")
+
+    while True:
+        uid_order = cursor_orders.fetchone()
+        if uid_order:
+            uid_order = uid_order[0]
+
+        if uid_order == None:
+            break
+        order_info = bittrex.order_info(str(uid_order))
+        if order_info['result']['Closed']:
+            cursor_orders.execute('DELETE FROM orders where uid = ?', (uid_order,))
+            orders_db.commit()
+            orders_db.execute("VACUUM")
+            text_msg = (f"Ордер:\n{order_info['result']['Exchange']}\n"
+                        f"на по цене {order_info['result']['Limit']:.8f} BTC\n"
+                        f"uid: {uid_order}\nзакрыт в {order_info['result']['Closed']}"
+                        f"Оставшееся количество:{order_info['result']['QuantityRemaining']}")
+            bot.send_message(bot.get_chat_id(update), text_msg)
+
 
 # Свой класс исключений
 class ScriptError(Exception):
     pass
 
 
-# загрузка последнего update_id из файла
-def load_last_msg(filename):
-    with open(filename) as f:
-        last_msg = int(f.readlines()[-1].rstrip())
-    return last_msg
-
-
-# загрузка данных из файла
-def load_text(filename):
-    text = []
-    with open(filename) as f:
-        for line in f.readlines():
-            text.append(line.rstrip())
-    return text
-
-
-# сохранение новых данных в файл
-def save_text(filename, type, *args):
-    with open(filename, type) as f:
-        f.write(str(*args) + '\n')
-
-
-# Выставление ордеров по репосту сообщения из чата Forstage team
-def signals_from_fostage(update):
-    try:
-
-        if bot.from_chat_id(update) == -1001149814828:  # id_chat Forstage team
-            msg_text = update['message']['text'].split()
-            if 'Покупка' in msg_text[1][1:]:
-                pair = msg_text[0].strip('🏎').split('/')
-                pair = pair[1] + '-' + pair[0]
-
-                buy_text = msg_text[2][:-1]
-                sell_1_text = msg_text[4][:-1]
-                sell_2_text = msg_text[6][:-1]
-                sell_3_text = msg_text[8][:-1]
-                bot.send_message(bot.get_chat_id(update),
-                                 f'{pair} купить по {buy_text}, цели: {sell_1_text}, {sell_2_text}, {sell_3_text}')
-
-                buy = float(buy_text)
-                sell_1 = float(sell_1_text)
-                sell_2 = float(sell_2_text)
-                sell_3 = float(sell_3_text)
-
-                if pair in bittrex.all_markets():  # если пара есть на бирже Bittrex
-                    bot.send_message(bot.get_chat_id(update), 'УРА! Эта пара есть на Биттрекс!')
-
-                    buy = buy / 2  # для отладки цена ордера уменьшина в 2 раза, чтобы ордер не сработал
-                    # quantity = float(bittrex.balance_btc(
-                    #     'BTC')) * 0.04 / buy  # 0.04 - ордер на 4% от доступного депозита BTC
-                    quantity = 0.0005 / buy  # ордер на сумму 0.0005 BTC
-                    buy_order, text_buy = bittrex.buylimit(pair, buy, quantity)
-
-                    if buy_order['success']:
-                        print(buy_order['result']['uuid'])
-                        save_text(log_open_buy_order, 'a', buy_order['result']['uuid'])  # сохраняем в файл
-                    bot.send_message(bot.get_chat_id(update),
-                                     f'{text_buy} ордер на покупку {pair.split("-")[1]} '
-                                     f'\nпо цене: {buy:.8f}\nколичество: {quantity:.8f} ')
-
-            else:
-                # print('Не содержит сигнала')
-                bot.send_message(bot.get_chat_id(update), 'Не содержит сигнала')
-        else:
-            bot.send_message(bot.get_chat_id(update), 'Сообщение не из чата Forsage Team')
-    except KeyError:
-        print('Сообщение не из чата Forsage Team')
-
-
 if __name__ == '__main__':
-
-
-
-    # экземпляр класса
-    bot = bot_class.BotHandler(TOKEN)
-
-
-    # основной цикл
     while True:
+        # экземпляр класса
+        bot = bot_class.BotHandler(TOKEN)
 
-        # try:
-        # последнее обновление, offset=<id last message>, last=True - последнее сообщение
-        update = bot.get_updates(offset=load_last_msg(log_msg), last=True)
-        buy_order_list = load_text(log_open_buy_order)  # список открытых ордеров
-        print(buy_order_list)
-        # проверка исполения/отмены ордера на покупку
+        # получаем новое сообщение
+        last_msg = new_msg(bot)
 
-        buy_order_list, closed_order_list = bittrex.del_closed_order(buy_order_list)
-        print(buy_order_list, closed_order_list)
-        save_text(log_open_buy_order, 'w', *buy_order_list)
+        # проверяем последнее письмо на данные из чата Forsage Team
+        if last_msg['Not empty']:
+            signals_from_fostage(bot, last_msg)
 
-        if update['update_id'] == load_last_msg(log_msg):
-            pass
-        else:
-            print('Новое сообщение. Добавляем в базу.')
-            save_text(log_msg, update['update_id'])
-            signals_from_fostage(update)
+        # проверяем выполнение ордеров
+        check_order_close(bot, last_msg)
 
         print('Новый цикл')
         time.sleep(1)
-        # except Exception as e:
-        #     print(e)
