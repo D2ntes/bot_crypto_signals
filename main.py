@@ -2,11 +2,14 @@ import sqlite3
 import time
 from datetime import datetime
 from typing import List, Any, Union
-
 import bittrex
 import bot_class
+from boto.s3.connection import S3Connection
+from os import environ
 
-TOKEN = ''
+
+TOKEN = S3Connection(environ['TOKEN'])
+
 
 orders_db = sqlite3.connect("orders.db")  # orders(uid, status, date_open, date_closed)
 messages_db = sqlite3.connect("messages.db")  # messages(id, text, date)

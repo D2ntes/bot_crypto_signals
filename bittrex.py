@@ -2,12 +2,13 @@ import hashlib
 import hmac
 import time
 import urllib
-
+from boto.s3.connection import S3Connection
 import requests
+from os import environ
 
-API_KEY = ''
+API_KEY = S3Connection(environ['API_KEY'])
 # обратите внимание, что добавлена 'b' перед строкой
-API_SECRET = b''
+API_SECRET == S3Connection(environ['API_SECRET'])
 
 API_URL = 'bittrex.com'
 API_VERSION = 'v1.1'
