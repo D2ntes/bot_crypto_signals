@@ -67,8 +67,6 @@ def buylimit(pair, buy, quantity):
     print(buylimit_order)
     return buylimit_order, text
 
-del selllimit(pair,)
-
 
 def balance_btc(name_coin):
     coin = name_coin
