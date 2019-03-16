@@ -8,7 +8,7 @@ from boto.s3.connection import S3Connection
 from os import environ
 
 
-TOKEN = S3Connection(environ['TOKEN'])
+TOKEN = environ['TOKEN']
 
 
 orders_db = sqlite3.connect("orders.db")  # orders(uid, status, date_open, date_closed)

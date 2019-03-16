@@ -6,9 +6,9 @@ from boto.s3.connection import S3Connection
 import requests
 from os import environ
 
-API_KEY = S3Connection(environ['API_KEY'])
+API_KEY =environ['API_KEY']
 # обратите внимание, что добавлена 'b' перед строкой
-API_SECRET == S3Connection(environ['API_SECRET'])
+API_SECRET == environ['API_SECRET']
 
 API_URL = 'bittrex.com'
 API_VERSION = 'v1.1'
